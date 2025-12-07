@@ -16,7 +16,7 @@
       color: #111827;
     }
 
-    /* CONTENEDOR PRINCIPAL SIN scroll-snap (lo hacemos por JS) */
+    /* CONTENEDOR PRINCIPAL SIN scroll-snap (snap por JS) */
     .snap-container {
       position: absolute;
       inset: 0;
@@ -311,25 +311,28 @@
           const img = panel.querySelector(".portfolio-image");
           const overlay = panel.querySelector(".gradient-overlay");
 
-          // offset vertical normalizado
-          const offset = (pc - center) / rect.height;
+          const offset = (pc - center) / rect.height; // -0.5 a 0.5 aprox
           const absOffset = Math.abs(offset);
-          const d = Math.min(absOffset * 1.3, 1); // 0 (centro) → 1 (lejos)
 
-          // efecto “sala”: leve desplazamiento en X y Y + escala
-          const translateX = offset * 32;  // un poco menos para reducir “temblor”
+          // 🔸 ZONA DE ENFOQUE REAL
+          const DEAD_ZONE = 0.04;
+          let d = Math.min(absOffset * 1.3, 1); // 0 (centro) → 1 (lejos)
+          if (absOffset < DEAD_ZONE) {
+            d = 0;
+          }
+
+          const translateX = offset * 32;
           const translateY = offset * -6;
-          const scale = 0.96 + (1 - d) * 0.10; // centro un poco más grande
+          const scale = 0.96 + (1 - d) * 0.10;
 
-          const opacity = 0.6 + (1 - d) * 0.4;  // centro más opaco
-          const blur = d * 3.2;                 // máximo ~3px
+          const opacity = 0.6 + (1 - d) * 0.4;
+          const blur = d * 3.2;
 
           inner.style.transform = `translate(${translateX}px, ${translateY}px) scale(${scale})`;
           inner.style.opacity = opacity.toFixed(3);
           img.style.filter = `blur(${blur.toFixed(1)}px) saturate(${1 + (1 - d) * 0.12})`;
           overlay.style.opacity = (0.08 + (1 - d) * 0.25).toFixed(3);
 
-          // z-index para que el centro quede por encima
           panel.style.zIndex = String(10 + Math.round((1 - d) * 10));
 
           if (dist < distMin) {
@@ -355,25 +358,24 @@
               }, 350);
             }
 
-            // actualizar texto para la nueva imagen
             infoContent.textContent = TEXTS[idx] || "";
-
-            // reiniciar pista del icono
             iconResetAnimation();
           }
         }
       }
 
+      // 🔸 Snap suave al panel cuyo CENTRO esté más cerca del centro de la pantalla
       function snapToNearestPanel() {
-        const containerRect = container.getBoundingClientRect();
-        const containerTop = containerRect.top;
+        const rect = container.getBoundingClientRect();
+        const viewportCenter = rect.top + rect.height / 2;
 
         let closest = null;
         let minDist = Infinity;
 
         panels.forEach(panel => {
-          const rect = panel.getBoundingClientRect();
-          const dist = Math.abs(rect.top - containerTop);
+          const p = panel.getBoundingClientRect();
+          const panelCenter = p.top + p.height / 2;
+          const dist = Math.abs(panelCenter - viewportCenter);
           if (dist < minDist) {
             minDist = dist;
             closest = panel;
@@ -382,15 +384,18 @@
 
         if (!closest) return;
 
-        const targetTop = closest.offsetTop;
+        const panelRect = closest.getBoundingClientRect();
+        const panelCenter = panelRect.top + panelRect.height / 2;
+        const delta = panelCenter - viewportCenter;
+
+        const targetScrollTop = container.scrollTop + delta;
 
         isSnapping = true;
         container.scrollTo({
-          top: targetTop,
+          top: targetScrollTop,
           behavior: "smooth"
         });
 
-        // después de un rato, liberamos el bloqueo de snap
         setTimeout(() => {
           isSnapping = false;
         }, 500);
@@ -405,6 +410,7 @@
         scrollTimeout = setTimeout(snapToNearestPanel, 120);
       });
 
+      // Primer cálculo para que la imagen inicial quede enfocada
       updatePanels();
     }
 
