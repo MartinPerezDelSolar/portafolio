@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <title>Portafolio</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    html, body { height: 100%; }
+
+    body {
+      background: #000;
+      overflow: hidden;
+      font-family: system-ui, -apple-system, Helvetica, Arial, sans-serif;
+      color: #e5e7eb;
+    }
+
+    .snap-container {
+      position: absolute;
+      inset: 0;
+      overflow-y: scroll;
+      overflow-x: hidden;
+      scroll-snap-type: y mandatory;
+      -webkit-overflow-scrolling: touch;
+      background: #000;
+    }
+
+    .snap-container::-webkit-scrollbar { width: 0; height: 0; }
+
+    .panel {
+      height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      scroll-snap-align: center;
+    }
+
+    .panel-inner {
+      width: min(100%, 1200px);
+      height: 100%;
+      border-radius: 24px;
+      overflow: hidden;
+      background: #000;
+      box-shadow: 0 24px 60px rgba(0,0,0,0.9);
+      transition:
+        transform 0.85s cubic-bezier(0.19, 0.66, 0.24, 1),
+        opacity 0.85s ease-out;
+    }
+
+    .image-wrapper {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #000;
+      overflow: hidden;
+    }
+
+    .portfolio-image {
+      max-width: 100%;
+      max-height: 100%;
+      object-fit: contain;
+      transition: filter 0.8s ease-out;
+    }
+
+    .gradient-overlay {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      opacity: 0;
+      background:
+        radial-gradient(circle at top, rgba(148,163,255,0.18), transparent 60%),
+        linear-gradient(to bottom, rgba(0,0,0,0.92), transparent 35%, rgba(0,0,0,0.96));
+      transition: opacity 0.8s ease-out;
+    }
+
+    /* ICONO DE TEXTO — cuadrado suave, derecha centrado */
+    .info-toggle {
+      position: fixed;
+      right: 1.8rem;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 42px;
+      height: 42px;
+      border-radius: 8px;
+      border: 1px solid rgba(255,255,255,0.25);
+      background: rgba(40,40,40,0.65);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      z-index: 200;
+      backdrop-filter: blur(12px);
+      box-shadow: 0 0 14px rgba(0,0,0,0.7);
+      opacity: 0.2;
+      transition:
+        opacity 0.4s ease-out,
+        transform 0.25s ease-out;
+    }
+
+    .info-toggle.active {
+      opacity: 1 !important;
+    }
+
+    .info-toggle:hover {
+      transform: translateY(-50%) scale(1.06);
+      opacity: 0.9;
+    }
+
+    .info-toggle-lines,
+    .info-toggle-lines::before,
+    .info-toggle-lines::after {
+      content: "";
+      display: block;
+      width: 16px;
+      height: 2px;
+      background: rgba(255,255,255,0.92);
+      border-radius: 4px;
+      position: relative;
+    }
+
+    .info-toggle-lines::before {
+      position: absolute;
+      top: -5px;
+    }
+
+    .info-toggle-lines::after {
+      position: absolute;
+      top: 5px;
+      width: 12px;
+      opacity: 0.8;
+    }
+
+    /* PANEL DE TEXTO — tercio inferior derecha con blur */
+    .info-panel {
+      position: fixed;
+      bottom: 1.6rem;
+      right: 1.8rem;
+      width: min(420px, 45vw);
+      height: min(280px, 35vh);
+      background: rgba(0,0,0,0.45);
+      border-radius: 18px;
+      border: 1px solid rgba(255,255,255,0.16);
+      backdrop-filter: blur(14px);
+      padding: 1rem 1.2rem;
+      box-shadow: 0 18px 40px rgba(0,0,0,0.9);
+      display: flex;
+      flex-direction: column;
+      transform: translate(0, 12px);
+      opacity: 0;
+      pointer-events: none;
+      transition:
+        transform 0.35s cubic-bezier(0.2, 0.7, 0.2, 1),
+        opacity 0.35s ease-out;
+      z-index: 190;
+    }
+
+    /* Estado visible normal */
+    .info-panel.open {
+      transform: translate(0, 0);
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    /* Estado de cierre en scroll: se va a la derecha y se desvanece */
+    .info-panel.closing {
+      transform: translate(32px, 0);
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .info-panel-content {
+      font-size: 0.9rem;
+      line-height: 1.6;
+      white-space: pre-line;
+      overflow-y: auto;
+    }
+
+    @media (max-width: 768px) {
+      .panel-inner { border-radius: 18px; }
+      .panel { padding: 0 1.4rem; }
+      .info-panel {
+        width: min(90vw, 420px);
+        right: 50%;
+        transform: translate(50%, 12px);
+      }
+      .info-panel.open {
+        transform: translate(50%, 0);
+      }
+      .info-panel.closing {
+        transform: translate(50% + 32px, 0); /* no se evalúa literalmente, pero en móviles ya se ve lateral */
+      }
+      .info-toggle {
+        right: 1.2rem;
+      }
+    }
+  </style>
+</head>
+<body>
+  <!-- ICONO TEXTO -->
+  <div class="info-toggle" id="infoToggle" role="button">
+    <span class="info-toggle-lines"></span>
+  </div>
+
+  <!-- PANEL TEXTO -->
+  <aside class="info-panel" id="infoPanel">
+    <div class="info-panel-content" id="infoContent"></div>
+  </aside>
+
+  <!-- GALERÍA -->
+  <div class="snap-container" id="snapContainer">
+    <main id="gallery"></main>
+  </div>
+
+  <script>
+    const MAX_IMAGES = 40;
+    const PATH = "imagenes";
+    const PREFIX = "imagen";
+    const EXT = ".jpg";
+
+    // Textos ejemplo (cámbialos por los tuyos)
+    const TEXTS = {
+      1: "Descripción ejemplo imagen 1.",
+      2: "Descripción ejemplo imagen 2.",
+      3: "Descripción ejemplo imagen 3.",
+      // 4: "Descripción imagen 4", ...
+    };
+
+    function createPanels() {
+      const gallery = document.getElementById("gallery");
+
+      for (let i = 1; i <= MAX_IMAGES; i++) {
+        const panel = document.createElement("section");
+        panel.className = "panel";
+        panel.dataset.index = i;
+        panel.style.display = "none";
+
+        const inner = document.createElement("div");
+        inner.className = "panel-inner";
+
+        const wrap = document.createElement("div");
+        wrap.className = "image-wrapper";
+
+        const img = document.createElement("img");
+        img.className = "portfolio-image";
+        img.src = `${PATH}/${PREFIX}${i}${EXT}`;
+        img.alt = "";
+
+        const grad = document.createElement("div");
+        grad.className = "gradient-overlay";
+
+        img.onload = () => { panel.style.display = "flex"; };
+        img.onerror = () => { panel.remove(); };
+
+        wrap.appendChild(img);
+        inner.appendChild(wrap);
+        inner.appendChild(grad);
+        panel.appendChild(inner);
+        gallery.appendChild(panel);
+      }
+    }
+
+    function iconResetAnimation() {
+      const icon = document.getElementById("infoToggle");
+
+      // reset inmediato
+      icon.style.transition = "none";
+      icon.style.opacity = "1";
+
+      // luego animamos a 0.2
+      setTimeout(() => {
+        icon.style.transition = "opacity 1.8s ease-out";
+        icon.style.opacity = "0.2";
+      }, 1500);
+    }
+
+    function setupScrollEffects() {
+      const container = document.getElementById("snapContainer");
+      const panels = [...document.querySelectorAll(".panel")];
+      const infoContent = document.getElementById("infoContent");
+      const infoPanel = document.getElementById("infoPanel");
+      const infoToggle = document.getElementById("infoToggle");
+
+      let activeIndex = null;
+
+      function updatePanels() {
+        const rect = container.getBoundingClientRect();
+        const center = rect.top + rect.height / 2;
+
+        let closest = null;
+        let distMin = Infinity;
+
+        panels.forEach(panel => {
+          const p = panel.getBoundingClientRect();
+          const pc = p.top + p.height / 2;
+          const dist = Math.abs(pc - center);
+
+          const inner = panel.querySelector(".panel-inner");
+          const img = panel.querySelector(".portfolio-image");
+          const overlay = panel.querySelector(".gradient-overlay");
+
+          const offset = (pc - center) / rect.height;
+          const absOffset = Math.abs(offset);
+          const FOCUS = 0.08;
+          const eff = absOffset < FOCUS ? 0 : offset;
+          const d = Math.min(Math.abs(eff) * 1.1, 1);
+
+          const scale = 1.01 + (1 - d) * 0.08;
+          const translateY = offset * -10;
+          const opacity = 0.82 + (1 - d) * 0.18;
+          const blur = d * 4;
+
+          inner.style.transform = `translateY(${translateY}px) scale(${scale})`;
+          inner.style.opacity = opacity.toFixed(3);
+          img.style.filter = `blur(${blur.toFixed(1)}px) saturate(${1 + (1 - d) * 0.15})`;
+          overlay.style.opacity = (0.12 + (1 - d) * 0.28).toFixed(3);
+
+          if (dist < distMin) {
+            distMin = dist;
+            closest = panel;
+          }
+        });
+
+        if (closest) {
+          const idx = parseInt(closest.dataset.index, 10);
+
+          if (idx !== activeIndex) {
+            activeIndex = idx;
+
+            // Cerrar suavemente la caja de texto anterior si estaba abierta
+            if (infoPanel.classList.contains("open")) {
+              infoPanel.classList.remove("open");
+              infoPanel.classList.add("closing");
+              infoToggle.classList.remove("active");
+
+              // quita la clase 'closing' después de la animación
+              setTimeout(() => {
+                infoPanel.classList.remove("closing");
+              }, 400);
+            }
+
+            // Actualizar contenido de texto para la nueva imagen
+            infoContent.textContent = TEXTS[idx] || "";
+
+            // Reiniciar animación del icono para nueva imagen
+            iconResetAnimation();
+          }
+        }
+      }
+
+      container.addEventListener("scroll", () => {
+        requestAnimationFrame(updatePanels);
+      });
+
+      updatePanels();
+    }
+
+    function setupInfoToggle() {
+      const icon = document.getElementById("infoToggle");
+      const panel = document.getElementById("infoPanel");
+
+      const toggle = () => {
+        const isOpen = panel.classList.toggle("open");
+        icon.classList.toggle("active", isOpen);
+      };
+
+      icon.addEventListener("click", toggle);
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+      createPanels();
+      setTimeout(() => {
+        setupScrollEffects();
+        setupInfoToggle();
+        iconResetAnimation(); // pista inicial al cargar la primera imagen
+      }, 300);
+    });
+  </script>
+</body>
+</html>
