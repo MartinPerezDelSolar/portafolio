@@ -11,53 +11,75 @@
 
     body {
       background: #ffffff;
-      overflow: hidden; /* solo scrollea el contenedor interno */
+      overflow: hidden; /* el scroll va en el contenedor, no en el body */
       font-family: system-ui, -apple-system, Helvetica, Arial, sans-serif;
       color: #111827;
     }
 
-    /* CONTENEDOR VERTICAL */
-    .snap-container {
-      position: absolute;
+    /* CONTENEDOR SCROLL GENERAL */
+    .scroll-container {
+      position: fixed;
       inset: 0;
-      overflow-y: auto;
+      overflow-y: scroll;
       overflow-x: hidden;
-      scroll-snap-type: y mandatory;      /* snap por defecto (PC / Android) */
       -webkit-overflow-scrolling: touch;
+      scroll-behavior: auto;
       background: #ffffff;
     }
 
-    .snap-container::-webkit-scrollbar { width: 0; height: 0; }
+    .scroll-container::-webkit-scrollbar {
+      width: 0;
+      height: 0;
+    }
 
+    /* CADA PANEL (UNA OBRA) */
     .panel {
-      height: 100vh;
+      min-height: 100vh;
       display: flex;
       align-items: center;
       justify-content: center;
-      scroll-snap-align: center;
-      scroll-snap-stop: always;
+      /* pequeño espacio entre paneles para que asome la siguiente */
+      padding: 4vh 0;
     }
 
     .panel-inner {
       width: 100%;
-      height: 100%;
+      max-width: 900px;
+      height: 90vh;          /* usa el 90% del alto de la pantalla */
+      margin: 0 auto;
+      border-radius: 0;
       overflow: hidden;
       background: #ffffff;
       box-shadow: 0 24px 60px rgba(0,0,0,0.06);
       transform-origin: center;
-      transform: translateY(20px) scale(0.95);
-      opacity: 0.7;
-      filter: blur(2px);
+      transform: translateY(40px) scale(0.92);
+      opacity: 0.5;
+      filter: blur(3px);
       transition:
-        transform 0.5s cubic-bezier(0.19, 0.66, 0.24, 1),
-        opacity 0.5s ease-out,
-        filter 0.5s ease-out;
+        transform 0.6s cubic-bezier(0.19, 0.66, 0.24, 1),
+        opacity 0.6s ease-out,
+        filter 0.6s ease-out;
     }
 
-    .panel-inner.active {
+    /* Imagen principal enfocada */
+    .panel.active .panel-inner {
       transform: translateY(0) scale(1);
       opacity: 1;
       filter: blur(0);
+    }
+
+    /* Siguiente imagen asomando abajo, en blur */
+    .panel.below .panel-inner {
+      transform: translateY(30px) scale(0.96);
+      opacity: 0.8;
+      filter: blur(2.5px);
+    }
+
+    /* La anterior arriba, más tenue */
+    .panel.above .panel-inner {
+      transform: translateY(-30px) scale(0.96);
+      opacity: 0.5;
+      filter: blur(3px);
     }
 
     .image-wrapper {
@@ -73,10 +95,10 @@
     .portfolio-image {
       max-width: 100%;
       max-height: 100%;
-      object-fit: contain; /* SIEMPRE completas */
+      object-fit: contain;  /* SIN corte: se ve completa, usando el máximo tamaño posible */
     }
 
-    /* ICONO DE TEXTO — cuadrado suave, derecha centrado */
+    /* ICONO DE TEXTO — cuadrado suave, derecha centrado en Y */
     .info-toggle {
       position: fixed;
       right: 1rem;
@@ -190,10 +212,7 @@
     @media (min-width: 768px) {
       .panel-inner {
         border-radius: 18px;
-        max-width: 900px;
-        margin: 0 auto;
       }
-      .panel { padding: 0 1.4rem; }
       .info-panel {
         left: 50%;
         right: auto;
@@ -220,8 +239,8 @@
     <div class="info-panel-content" id="infoContent"></div>
   </aside>
 
-  <!-- GALERÍA CON SCROLL VERTICAL -->
-  <div class="snap-container" id="snapContainer">
+  <!-- GALERÍA -->
+  <div class="scroll-container" id="scrollContainer">
     <main id="gallery"></main>
   </div>
 
@@ -231,7 +250,7 @@
     const PREFIX = "imagen";
     const EXT = ".jpg";
 
-    // Textos de ejemplo (ajusta a tu portafolio real)
+    // Textos de ejemplo (ajusta por tu portafolio)
     const TEXTS = {
       1: "Descripción ejemplo imagen 1.\nTécnica, año, medidas, serie, etc.",
       2: "Descripción ejemplo imagen 2.",
@@ -280,7 +299,7 @@
     }
 
     function setupScrollEffects() {
-      const container = document.getElementById("snapContainer");
+      const container = document.getElementById("scrollContainer");
       const panels = Array.from(document.querySelectorAll(".panel"));
       const infoContent = document.getElementById("infoContent");
       const infoPanel = document.getElementById("infoPanel");
@@ -288,67 +307,112 @@
 
       if (panels.length === 0) return;
 
-      let activeIndex = null;
+      let currentActive = null;
+      let scrollTimeout = null;
+      let isSnapping = false;
 
-      function updatePanels() {
-        const rect = container.getBoundingClientRect();
-        const center = rect.top + rect.height / 2;
+      function updateActive() {
+        const containerHeight = container.clientHeight;
+        const targetCenter = container.scrollTop + containerHeight / 2;
 
-        let closest = null;
+        let closestPanel = null;
         let minDist = Infinity;
 
         panels.forEach(panel => {
-          const pRect = panel.getBoundingClientRect();
-          const panelCenter = pRect.top + pRect.height / 2;
-          const dist = Math.abs(panelCenter - center);
-
-          const inner = panel.querySelector(".panel-inner");
-          if (!inner) return;
-
+          const panelTop = panel.offsetTop;
+          const panelHeight = panel.offsetHeight;
+          const panelCenter = panelTop + panelHeight / 2;
+          const dist = Math.abs(panelCenter - targetCenter);
           if (dist < minDist) {
             minDist = dist;
-            closest = panel;
+            closestPanel = panel;
           }
         });
 
-        panels.forEach(panel => {
-          const inner = panel.querySelector(".panel-inner");
-          if (!inner) return;
-          inner.classList.remove("active");
-        });
+        if (!closestPanel) return;
 
-        if (closest) {
-          const inner = closest.querySelector(".panel-inner");
-          if (inner) inner.classList.add("active");
+        if (closestPanel !== currentActive) {
+          currentActive = closestPanel;
 
-          const idx = parseInt(closest.dataset.index, 10);
-          if (idx !== activeIndex) {
-            activeIndex = idx;
+          // limpiar clases
+          panels.forEach(p => {
+            p.classList.remove("active", "above", "below");
+          });
 
-            // actualizar texto
-            infoContent.textContent = TEXTS[idx] || "";
+          currentActive.classList.add("active");
 
-            // si la caja estaba abierta, se cierra
-            if (infoPanel.classList.contains("open")) {
-              infoPanel.classList.remove("open");
-              infoPanel.classList.add("closing");
-              infoToggle.classList.remove("active");
-              setTimeout(() => {
-                infoPanel.classList.remove("closing");
-              }, 300);
-            }
-
-            iconResetAnimation();
+          const idx = panels.indexOf(currentActive);
+          if (idx > 0) {
+            panels[idx - 1].classList.add("above");
           }
+          if (idx < panels.length - 1) {
+            panels[idx + 1].classList.add("below");
+          }
+
+          const imgIndex = parseInt(currentActive.dataset.index, 10);
+          infoContent.textContent = TEXTS[imgIndex] || "";
+
+          if (infoPanel.classList.contains("open")) {
+            infoPanel.classList.remove("open");
+            infoPanel.classList.add("closing");
+            infoToggle.classList.remove("active");
+            setTimeout(() => {
+              infoPanel.classList.remove("closing");
+            }, 300);
+          }
+
+          iconResetAnimation();
         }
       }
 
+      function snapToNearestPanel() {
+        const containerHeight = container.clientHeight;
+        const targetCenter = container.scrollTop + containerHeight / 2;
+
+        let closestPanel = null;
+        let minDist = Infinity;
+
+        panels.forEach(panel => {
+          const panelTop = panel.offsetTop;
+          const panelHeight = panel.offsetHeight;
+          const panelCenter = panelTop + panelHeight / 2;
+          const dist = Math.abs(panelCenter - targetCenter);
+          if (dist < minDist) {
+            minDist = dist;
+            closestPanel = panel;
+          }
+        });
+
+        if (!closestPanel) return;
+
+        const panelTop = closestPanel.offsetTop;
+        const panelHeight = closestPanel.offsetHeight;
+        const panelCenter = panelTop + panelHeight / 2;
+
+        const newScrollTop = panelCenter - containerHeight / 2;
+
+        isSnapping = true;
+        container.scrollTo({
+          top: newScrollTop,
+          behavior: "smooth"
+        });
+
+        setTimeout(() => {
+          isSnapping = false;
+        }, 500);
+      }
+
       container.addEventListener("scroll", () => {
-        requestAnimationFrame(updatePanels);
+        if (!isSnapping) {
+          requestAnimationFrame(updateActive);
+          clearTimeout(scrollTimeout);
+          scrollTimeout = setTimeout(snapToNearestPanel, 140);
+        }
       });
 
-      // Llamada inicial
-      updatePanels();
+      // primer cálculo y “snap” inicial a la primera imagen
+      updateActive();
+      snapToNearestPanel();
     }
 
     function setupInfoToggle() {
@@ -368,21 +432,9 @@
       }, { passive: false });
     }
 
-    function disableSnapOnIOS() {
-      const ua = navigator.userAgent || navigator.vendor || "";
-      const isIOS = /iPhone|iPad|iPod/i.test(ua);
-      if (isIOS) {
-        const container = document.getElementById("snapContainer");
-        // Desactivar scroll-snap en iOS para evitar comportamientos caprichosos
-        container.style.scrollSnapType = "none";
-        container.style.webkitScrollSnapType = "none";
-      }
-    }
-
     document.addEventListener("DOMContentLoaded", () => {
       createPanels();
       setTimeout(() => {
-        disableSnapOnIOS();
         setupScrollEffects();
         setupInfoToggle();
         iconResetAnimation();
