@@ -11,70 +11,53 @@
 
     body {
       background: #ffffff;
-      overflow: hidden; /* nada de scroll de la página, todo es nuestra galería */
+      overflow: hidden; /* solo scrollea el contenedor interno */
       font-family: system-ui, -apple-system, Helvetica, Arial, sans-serif;
       color: #111827;
     }
 
-    /* CONTENEDOR GENERAL (no hace scroll real, solo se usa como superficie de eventos) */
-    .viewport {
+    /* CONTENEDOR VERTICAL */
+    .snap-container {
       position: absolute;
       inset: 0;
-      overflow: hidden;
+      overflow-y: auto;
+      overflow-x: hidden;
+      scroll-snap-type: y mandatory;      /* snap por defecto (PC / Android) */
+      -webkit-overflow-scrolling: touch;
       background: #ffffff;
-      touch-action: none; /* ayuda a que iOS no meta scroll raro */
     }
 
-    /* Contenedor de panels */
-    .slider {
-      position: relative;
-      width: 100%;
-      height: 100%;
-    }
+    .snap-container::-webkit-scrollbar { width: 0; height: 0; }
 
     .panel {
-      position: absolute;
-      inset: 0;
+      height: 100vh;
       display: flex;
       align-items: center;
       justify-content: center;
-      pointer-events: none;
+      scroll-snap-align: center;
+      scroll-snap-stop: always;
     }
 
     .panel-inner {
       width: 100%;
       height: 100%;
-      border-radius: 0;
       overflow: hidden;
       background: #ffffff;
       box-shadow: 0 24px 60px rgba(0,0,0,0.06);
       transform-origin: center;
-      transform: translateX(40px) scale(0.94);
-      opacity: 0;
-      filter: blur(3px);
+      transform: translateY(20px) scale(0.95);
+      opacity: 0.7;
+      filter: blur(2px);
       transition:
-        transform 0.6s cubic-bezier(0.19, 0.66, 0.24, 1),
-        opacity 0.6s ease-out,
-        filter 0.6s ease-out;
+        transform 0.5s cubic-bezier(0.19, 0.66, 0.24, 1),
+        opacity 0.5s ease-out,
+        filter 0.5s ease-out;
     }
 
     .panel-inner.active {
+      transform: translateY(0) scale(1);
       opacity: 1;
-      transform: translateX(0) scale(1);
       filter: blur(0);
-      pointer-events: auto;
-    }
-
-    .panel-inner.prev {
-      opacity: 0.7;
-      transform: translateX(-30px) scale(0.95);
-      filter: blur(2px);
-    }
-
-    .panel-inner.next {
-      opacity: 0.7;
-      transform: translateX(30px) scale(0.95);
-      filter: blur(2px);
     }
 
     .image-wrapper {
@@ -90,7 +73,7 @@
     .portfolio-image {
       max-width: 100%;
       max-height: 100%;
-      object-fit: contain; /* SIEMPRE completas, sin recortar */
+      object-fit: contain; /* SIEMPRE completas */
     }
 
     /* ICONO DE TEXTO — cuadrado suave, derecha centrado */
@@ -210,6 +193,7 @@
         max-width: 900px;
         margin: 0 auto;
       }
+      .panel { padding: 0 1.4rem; }
       .info-panel {
         left: 50%;
         right: auto;
@@ -236,11 +220,9 @@
     <div class="info-panel-content" id="infoContent"></div>
   </aside>
 
-  <!-- GALERÍA (sin scroll real, solo transiciones) -->
-  <div class="viewport" id="viewport">
-    <div class="slider" id="slider">
-      <!-- panels se generan por JS -->
-    </div>
+  <!-- GALERÍA CON SCROLL VERTICAL -->
+  <div class="snap-container" id="snapContainer">
+    <main id="gallery"></main>
   </div>
 
   <script>
@@ -258,12 +240,12 @@
     };
 
     function createPanels() {
-      const slider = document.getElementById("slider");
+      const gallery = document.getElementById("gallery");
 
       for (let i = 1; i <= MAX_IMAGES; i++) {
         const panel = document.createElement("section");
         panel.className = "panel";
-        panel.dataset.index = i - 1;
+        panel.dataset.index = i;
 
         const inner = document.createElement("div");
         inner.className = "panel-inner";
@@ -276,10 +258,6 @@
         img.src = `${PATH}/${PREFIX}${i}${EXT}`;
         img.alt = "";
 
-        // si carga, mostramos; si no, eliminamos panel
-        img.onload = () => {
-          panel.style.display = "flex";
-        };
         img.onerror = () => {
           panel.remove();
         };
@@ -287,8 +265,7 @@
         wrap.appendChild(img);
         inner.appendChild(wrap);
         panel.appendChild(inner);
-        panel.style.display = "none"; // hasta que cargue
-        slider.appendChild(panel);
+        gallery.appendChild(panel);
       }
     }
 
@@ -302,8 +279,8 @@
       }, 900);
     }
 
-    function setupSlider() {
-      const viewport = document.getElementById("viewport");
+    function setupScrollEffects() {
+      const container = document.getElementById("snapContainer");
       const panels = Array.from(document.querySelectorAll(".panel"));
       const infoContent = document.getElementById("infoContent");
       const infoPanel = document.getElementById("infoPanel");
@@ -311,102 +288,67 @@
 
       if (panels.length === 0) return;
 
-      let currentIndex = 0;
-      let isAnimating = false;
+      let activeIndex = null;
 
-      function updateActive() {
-        panels.forEach((panel, i) => {
+      function updatePanels() {
+        const rect = container.getBoundingClientRect();
+        const center = rect.top + rect.height / 2;
+
+        let closest = null;
+        let minDist = Infinity;
+
+        panels.forEach(panel => {
+          const pRect = panel.getBoundingClientRect();
+          const panelCenter = pRect.top + pRect.height / 2;
+          const dist = Math.abs(panelCenter - center);
+
           const inner = panel.querySelector(".panel-inner");
-          panel.style.display = "flex"; // aseguramos que se muestren las válidas
-          inner.classList.remove("active", "prev", "next");
+          if (!inner) return;
 
-          if (i === currentIndex) {
-            inner.classList.add("active");
-          } else if (i === currentIndex - 1) {
-            inner.classList.add("prev");
-          } else if (i === currentIndex + 1) {
-            inner.classList.add("next");
+          if (dist < minDist) {
+            minDist = dist;
+            closest = panel;
           }
         });
 
-        const text = TEXTS[currentIndex + 1] || "";
-        infoContent.textContent = text;
+        panels.forEach(panel => {
+          const inner = panel.querySelector(".panel-inner");
+          if (!inner) return;
+          inner.classList.remove("active");
+        });
 
-        if (infoPanel.classList.contains("open")) {
-          infoPanel.classList.remove("open");
-          infoPanel.classList.add("closing");
-          infoToggle.classList.remove("active");
-          setTimeout(() => {
-            infoPanel.classList.remove("closing");
-          }, 300);
-        }
+        if (closest) {
+          const inner = closest.querySelector(".panel-inner");
+          if (inner) inner.classList.add("active");
 
-        iconResetAnimation();
-      }
+          const idx = parseInt(closest.dataset.index, 10);
+          if (idx !== activeIndex) {
+            activeIndex = idx;
 
-      function goToIndex(newIndex) {
-        newIndex = Math.max(0, Math.min(panels.length - 1, newIndex));
-        if (newIndex === currentIndex) return;
-        if (isAnimating) return;
+            // actualizar texto
+            infoContent.textContent = TEXTS[idx] || "";
 
-        isAnimating = true;
-        currentIndex = newIndex;
-        updateActive();
+            // si la caja estaba abierta, se cierra
+            if (infoPanel.classList.contains("open")) {
+              infoPanel.classList.remove("open");
+              infoPanel.classList.add("closing");
+              infoToggle.classList.remove("active");
+              setTimeout(() => {
+                infoPanel.classList.remove("closing");
+              }, 300);
+            }
 
-        setTimeout(() => {
-          isAnimating = false;
-        }, 650); // dura lo mismo que la transición CSS
-      }
-
-      // Primera imagen activa
-      currentIndex = 0;
-      updateActive();
-
-      // Navegación con rueda del mouse (PC)
-      viewport.addEventListener("wheel", (e) => {
-        e.preventDefault();
-        if (isAnimating) return;
-
-        if (e.deltaY > 10) {
-          goToIndex(currentIndex + 1);
-        } else if (e.deltaY < -10) {
-          goToIndex(currentIndex - 1);
-        }
-      }, { passive: false });
-
-      // Navegación por swipe (móvil / tablet)
-      let touchStartY = null;
-      let touchEndY = null;
-
-      viewport.addEventListener("touchstart", (e) => {
-        if (e.touches.length === 1) {
-          touchStartY = e.touches[0].clientY;
-          touchEndY = touchStartY;
-        }
-      }, { passive: true });
-
-      viewport.addEventListener("touchmove", (e) => {
-        if (touchStartY == null) return;
-        touchEndY = e.touches[0].clientY;
-      }, { passive: true });
-
-      viewport.addEventListener("touchend", (e) => {
-        if (touchStartY == null || touchEndY == null) return;
-        const deltaY = touchStartY - touchEndY;
-        const threshold = 40; // mínimo para considerar swipe
-
-        if (Math.abs(deltaY) > threshold) {
-          if (deltaY > 0) {
-            // swipe hacia arriba → siguiente imagen
-            goToIndex(currentIndex + 1);
-          } else {
-            // swipe hacia abajo → imagen anterior
-            goToIndex(currentIndex - 1);
+            iconResetAnimation();
           }
         }
-        touchStartY = null;
-        touchEndY = null;
+      }
+
+      container.addEventListener("scroll", () => {
+        requestAnimationFrame(updatePanels);
       });
+
+      // Llamada inicial
+      updatePanels();
     }
 
     function setupInfoToggle() {
@@ -426,13 +368,25 @@
       }, { passive: false });
     }
 
+    function disableSnapOnIOS() {
+      const ua = navigator.userAgent || navigator.vendor || "";
+      const isIOS = /iPhone|iPad|iPod/i.test(ua);
+      if (isIOS) {
+        const container = document.getElementById("snapContainer");
+        // Desactivar scroll-snap en iOS para evitar comportamientos caprichosos
+        container.style.scrollSnapType = "none";
+        container.style.webkitScrollSnapType = "none";
+      }
+    }
+
     document.addEventListener("DOMContentLoaded", () => {
       createPanels();
       setTimeout(() => {
-        setupSlider();
+        disableSnapOnIOS();
+        setupScrollEffects();
         setupInfoToggle();
         iconResetAnimation();
-      }, 400);
+      }, 300);
     });
   </script>
 </body>
