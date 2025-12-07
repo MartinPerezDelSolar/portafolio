@@ -16,12 +16,13 @@
       color: #111827;
     }
 
-    /* CONTENEDOR PRINCIPAL SIN scroll-snap (snap por JS) */
+    /* CONTENEDOR PRINCIPAL CON scroll-snap NATIVO */
     .snap-container {
       position: absolute;
       inset: 0;
       overflow-y: scroll;
       overflow-x: hidden;
+      scroll-snap-type: y mandatory;
       -webkit-overflow-scrolling: touch;
       background: #ffffff;
     }
@@ -33,6 +34,8 @@
       display: flex;
       align-items: center;
       justify-content: center;
+      scroll-snap-align: center;
+      scroll-snap-stop: always; /* intenta no saltarse paneles */
     }
 
     .panel-inner {
@@ -237,6 +240,7 @@
       1: "Descripción ejemplo imagen 1.\nPuedes poner técnica, año, medidas, serie, etc.",
       2: "Descripción ejemplo imagen 2.",
       3: "Descripción ejemplo imagen 3.",
+      // 4: "Descripción imagen 4", ...
     };
 
     function createPanels() {
@@ -292,8 +296,6 @@
       const infoToggle = document.getElementById("infoToggle");
 
       let activeIndex = null;
-      let isSnapping = false;
-      let scrollTimeout = null;
 
       function updatePanels() {
         const rect = container.getBoundingClientRect();
@@ -314,7 +316,7 @@
           const offset = (pc - center) / rect.height; // -0.5 a 0.5 aprox
           const absOffset = Math.abs(offset);
 
-          // 🔸 ZONA DE ENFOQUE REAL
+          // ZONA DE ENFOQUE REAL
           const DEAD_ZONE = 0.04;
           let d = Math.min(absOffset * 1.3, 1); // 0 (centro) → 1 (lejos)
           if (absOffset < DEAD_ZONE) {
@@ -347,7 +349,7 @@
           if (idx !== activeIndex) {
             activeIndex = idx;
 
-            // cerrar suavemente la caja si estaba abierta
+            // si la caja estaba abierta, se cierra elegantemente
             if (infoPanel.classList.contains("open")) {
               infoPanel.classList.remove("open");
               infoPanel.classList.add("closing");
@@ -364,50 +366,8 @@
         }
       }
 
-      // 🔸 Snap suave al panel cuyo CENTRO esté más cerca del centro de la pantalla
-      function snapToNearestPanel() {
-        const rect = container.getBoundingClientRect();
-        const viewportCenter = rect.top + rect.height / 2;
-
-        let closest = null;
-        let minDist = Infinity;
-
-        panels.forEach(panel => {
-          const p = panel.getBoundingClientRect();
-          const panelCenter = p.top + p.height / 2;
-          const dist = Math.abs(panelCenter - viewportCenter);
-          if (dist < minDist) {
-            minDist = dist;
-            closest = panel;
-          }
-        });
-
-        if (!closest) return;
-
-        const panelRect = closest.getBoundingClientRect();
-        const panelCenter = panelRect.top + panelRect.height / 2;
-        const delta = panelCenter - viewportCenter;
-
-        const targetScrollTop = container.scrollTop + delta;
-
-        isSnapping = true;
-        container.scrollTo({
-          top: targetScrollTop,
-          behavior: "smooth"
-        });
-
-        setTimeout(() => {
-          isSnapping = false;
-        }, 500);
-      }
-
       container.addEventListener("scroll", () => {
         requestAnimationFrame(updatePanels);
-
-        if (isSnapping) return;
-
-        clearTimeout(scrollTimeout);
-        scrollTimeout = setTimeout(snapToNearestPanel, 120);
       });
 
       // Primer cálculo para que la imagen inicial quede enfocada
