@@ -16,13 +16,12 @@
       color: #111827;
     }
 
-    /* CONTENEDOR PRINCIPAL CON RULETA */
+    /* CONTENEDOR PRINCIPAL SIN scroll-snap (lo hacemos por JS) */
     .snap-container {
       position: absolute;
       inset: 0;
       overflow-y: scroll;
       overflow-x: hidden;
-      scroll-snap-type: y mandatory;
       -webkit-overflow-scrolling: touch;
       background: #ffffff;
     }
@@ -34,7 +33,6 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      scroll-snap-align: center;
     }
 
     .panel-inner {
@@ -46,7 +44,7 @@
       box-shadow: 0 24px 60px rgba(0,0,0,0.06);
       transition:
         transform 0.65s cubic-bezier(0.19, 0.66, 0.24, 1),
-        opacity 0.65s ease-out;  /* más suave y fluido */
+        opacity 0.65s ease-out;
       transform-origin: center;
     }
 
@@ -64,7 +62,7 @@
       max-width: 100%;
       max-height: 100%;
       object-fit: contain;
-      transition: filter 0.65s ease-out;  /* blur más fluido */
+      transition: filter 0.65s ease-out;
       will-change: transform, filter, opacity;
     }
 
@@ -294,6 +292,8 @@
       const infoToggle = document.getElementById("infoToggle");
 
       let activeIndex = null;
+      let isSnapping = false;
+      let scrollTimeout = null;
 
       function updatePanels() {
         const rect = container.getBoundingClientRect();
@@ -312,13 +312,13 @@
           const overlay = panel.querySelector(".gradient-overlay");
 
           // offset vertical normalizado
-          const offset = (pc - center) / rect.height; // -0.5 a 0.5 aprox.
+          const offset = (pc - center) / rect.height;
           const absOffset = Math.abs(offset);
           const d = Math.min(absOffset * 1.3, 1); // 0 (centro) → 1 (lejos)
 
           // efecto “sala”: leve desplazamiento en X y Y + escala
-          const translateX = offset * 40;  // se cruzan un poco en horizontal
-          const translateY = offset * -6;  // leve parallax vertical
+          const translateX = offset * 32;  // un poco menos para reducir “temblor”
+          const translateY = offset * -6;
           const scale = 0.96 + (1 - d) * 0.10; // centro un poco más grande
 
           const opacity = 0.6 + (1 - d) * 0.4;  // centro más opaco
@@ -364,8 +364,45 @@
         }
       }
 
+      function snapToNearestPanel() {
+        const containerRect = container.getBoundingClientRect();
+        const containerTop = containerRect.top;
+
+        let closest = null;
+        let minDist = Infinity;
+
+        panels.forEach(panel => {
+          const rect = panel.getBoundingClientRect();
+          const dist = Math.abs(rect.top - containerTop);
+          if (dist < minDist) {
+            minDist = dist;
+            closest = panel;
+          }
+        });
+
+        if (!closest) return;
+
+        const targetTop = closest.offsetTop;
+
+        isSnapping = true;
+        container.scrollTo({
+          top: targetTop,
+          behavior: "smooth"
+        });
+
+        // después de un rato, liberamos el bloqueo de snap
+        setTimeout(() => {
+          isSnapping = false;
+        }, 500);
+      }
+
       container.addEventListener("scroll", () => {
         requestAnimationFrame(updatePanels);
+
+        if (isSnapping) return;
+
+        clearTimeout(scrollTimeout);
+        scrollTimeout = setTimeout(snapToNearestPanel, 120);
       });
 
       updatePanels();
