@@ -3,51 +3,16 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Portafolio Artístico</title>
-    <link rel="stylesheet" href="estilos.css">
+    <title>Portafolio Scroll 3D Creativo</title>
+    <link rel="stylesheet" href="portafolio-3d.css">
 </head>
 <body>
     <header>
         <h1>Portafolio Ilustraciones</h1>
     </header>
-    <main class="galeria-scroll">
-        <img src="imagenes/imagen1.jpg" alt="Obra 1" class="imagen-arte">
-        <img src="imagenes/imagen2.jpg" alt="Obra 2" class="imagen-arte">
-        <img src="imagenes/imagen3.jpg" alt="Obra 3" class="imagen-arte">
-        <img src="imagenes/imagen4.jpg" alt="Obra 4" class="imagen-arte">
-        <img src="imagenes/imagen5.jpg" alt="Obra 5" class="imagen-arte">
-        <img src="imagenes/imagen6.jpg" alt="Obra 6" class="imagen-arte">
-        <img src="imagenes/imagen7.jpg" alt="Obra 7" class="imagen-arte">
-        <img src="imagenes/imagen8.jpg" alt="Obra 8" class="imagen-arte">
-        <img src="imagenes/imagen9.jpg" alt="Obra 9" class="imagen-arte">
-        <img src="imagenes/imagen10.jpg" alt="Obra 10" class="imagen-arte">
-        <img src="imagenes/imagen11.jpg" alt="Obra 11" class="imagen-arte">
+    <main>
+        <div class="galeria-3d" id="galeria-3d"></div>
     </main>
-    <script src="efectos.js"></script>
-</body>
-<script>
-// Mostrar mensaje tras subir imagen
-document.getElementById('form-subida').addEventListener('submit', async function(e) {
-    e.preventDefault();
-    const form = e.target;
-    const data = new FormData(form);
-    const mensaje = document.getElementById('mensaje-subida');
-    mensaje.textContent = 'Subiendo...';
-    try {
-        const res = await fetch('/upload', {
-            method: 'POST',
-            body: data
-        });
-        if (res.ok) {
-            mensaje.textContent = '¡Imagen subida! Recarga para verla.';
-            form.reset();
-        } else {
-            mensaje.textContent = 'Error al subir.';
-        }
-    } catch {
-        mensaje.textContent = 'Error de conexión.';
-    }
-});
-</script>
+    <script src="portafolio-3d.js"></script>
 </body>
 </html>
