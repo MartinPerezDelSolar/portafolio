@@ -1,43 +1,23 @@
-// Debounce timeout variable
-let scrollTimeout;
-
-// Function to show visible images with original funcionamiento code
+// Efecto de visibilidad para imágenes de arte
 function mostrarImagenesVisibles() {
-    const imagenes = document.querySelectorAll('img[data-src]');
+    const imagenesArte = document.querySelectorAll('.imagen-arte');
     
-    imagenes.forEach(img => {
-        const rect = img.getBoundingClientRect();
-        const isVisible = (
-            rect.top < window.innerHeight &&
-            rect.bottom > 0 &&
-            rect.left < window.innerWidth &&
-            rect.right > 0
-        );
+    imagenesArte.forEach(imagen => {
+        const rect = imagen.getBoundingClientRect();
+        const estaVisible = rect.top < window.innerHeight && rect.bottom > 0;
         
-        if (isVisible && !img.src) {
-            img.src = img.dataset.src;
-            img.removeAttribute('data-src');
-            
-            // Image focusing and centering
-            img.style.objectFit = 'cover';
-            img.style.objectPosition = 'center';
+        if (estaVisible) {
+            imagen.classList.add('visible');
+            imagen.style.transform = 'scale(1.08)';
+        } else {
+            imagen.classList.remove('visible');
+            imagen.style.transform = 'scale(1)';
         }
     });
 }
 
-// Debounced scroll event handler
-function debouncedMostrarImagenesVisibles() {
-    clearTimeout(scrollTimeout);
-    scrollTimeout = setTimeout(() => {
-        mostrarImagenesVisibles();
-    }, 16); // 16ms timeout for smooth scrolling (60fps)
-}
-
-// Initialize on page load
+// Ejecutar la función al cargar la página
 document.addEventListener('DOMContentLoaded', mostrarImagenesVisibles);
 
-// Add debounced scroll listener
-window.addEventListener('scroll', debouncedMostrarImagenesVisibles, { passive: true });
-
-// Optional: Also call on resize
-window.addEventListener('resize', debouncedMostrarImagenesVisibles);
+// Ejecutar la función cuando se hace scroll
+window.addEventListener('scroll', mostrarImagenesVisibles);
