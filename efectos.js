@@ -1,149 +1,154 @@
-// Efecto de blur dinámico en scroll
-// Efecto de blur dinámico y centrado en scroll
-function mostrarImagenesVisibles() {
-    const imagenes = document.querySelectorAll('.imagen-arte');
-    const centroVentana = window.innerHeight / 2;
-    let minDist = Infinity;
-    let masCentrada = null;
-    imagenes.forEach(img => {
-        const rect = img.getBoundingClientRect();
-        const centroImg = rect.top + rect.height / 2;
-        const distancia = Math.abs(centroImg - centroVentana);
-        if (distancia < minDist) {
-            minDist = distancia;
-            masCentrada = img;
-        }
-        img.classList.remove('visible');
-        img.style.transform = '';
-    });
-    if (masCentrada) {
-        masCentrada.classList.add('visible');
-        const rect = masCentrada.getBoundingClientRect();
-        const centroImg = rect.top + rect.height / 2;
-        const desplazamiento = centroVentana - centroImg;
-        masCentrada.style.transform = `scale(1.08) translateY(${desplazamiento}px)`;
-    }
-}
+// Zoom overlay functionality
+const zoomOverlay = document.querySelector('.zoom-overlay');
+const zoomImage = document.querySelector('.zoom-overlay img');
+const zoomCloseBtn = document.querySelector('.zoom-overlay .close-btn');
 
-document.addEventListener('scroll', mostrarImagenesVisibles);
-document.addEventListener('DOMContentLoaded', mostrarImagenesVisibles);
-window.addEventListener('resize', mostrarImagenesVisibles);
+let isDragging = false;
+let startX = 0;
+let startY = 0;
+let currentX = 0;
+let currentY = 0;
+let scale = 1;
 
-// Ocultar header al hacer scroll
-let header = document.querySelector('header');
-let scrollDetectado = false;
-window.addEventListener('scroll', function() {
-    if (!scrollDetectado && window.scrollY > 10) {
-        header.classList.add('header-oculto');
-        scrollDetectado = true;
-    } else if (scrollDetectado && window.scrollY <= 10) {
-        header.classList.remove('header-oculto');
-        scrollDetectado = false;
-    }
+// Open zoom
+document.querySelectorAll('img[data-zoomable="true"]').forEach(img => {
+  img.addEventListener('click', function(e) {
+    zoomImage.src = this.src;
+    zoomOverlay.classList.add('active');
+    scale = 1;
+    currentX = 0;
+    currentY = 0;
+    updateImageTransform();
+  });
 });
 
+// Close zoom
+zoomCloseBtn?.addEventListener('click', () => {
+  zoomOverlay.classList.remove('active');
+});
 
-// Zoom real al hacer click/tap y mover imagen
-function crearZoomReal(img) {
-    // Crear overlay
-    const overlay = document.createElement('div');
-    overlay.className = 'zoom-real-overlay';
-    // Crear imagen clonada
-    const imgZoom = document.createElement('img');
-    imgZoom.src = img.src;
-    imgZoom.alt = img.alt;
-    imgZoom.className = 'zoom-real-img';
-    overlay.appendChild(imgZoom);
-    document.body.appendChild(overlay);
-    document.body.style.overflow = 'hidden';
+zoomOverlay?.addEventListener('click', (e) => {
+  if (e.target === zoomOverlay) {
+    zoomOverlay.classList.remove('active');
+  }
+});
 
-    // Centrar la imagen
-    let offsetX = 0, offsetY = 0, startX = 0, startY = 0, dragging = false, moved = false;
+// Touch events for zoom overlay
+zoomOverlay?.addEventListener('touchstart', (e) => {
+  if (e.touches.length === 1) {
+    isDragging = true;
+    startX = e.touches[0].clientX - currentX;
+    startY = e.touches[0].clientY - currentY;
+  } else if (e.touches.length === 2) {
+    isDragging = false;
+  }
+}, { passive: true });
 
-    function startDrag(e) {
-        dragging = true;
-        moved = false;
-        overlay.style.cursor = 'grabbing';
-        if (e.type.startsWith('touch')) {
-            startX = e.touches[0].clientX - offsetX;
-            startY = e.touches[0].clientY - offsetY;
-        } else {
-            startX = e.clientX - offsetX;
-            startY = e.clientY - offsetY;
-        }
-        e.preventDefault();
+zoomOverlay?.addEventListener('touchmove', (e) => {
+  if (isDragging && e.touches.length === 1) {
+    currentX = e.touches[0].clientX - startX;
+    currentY = e.touches[0].clientY - startY;
+    updateImageTransform();
+    // Only prevent default if there's actual dragging happening
+    if (Math.abs(currentX) > 5 || Math.abs(currentY) > 5) {
+      e.preventDefault();
     }
-    function onDrag(e) {
-        if (!dragging) return;
-        let x, y;
-        if (e.type.startsWith('touch')) {
-            x = e.touches[0].clientX;
-            y = e.touches[0].clientY;
-        } else {
-            x = e.clientX;
-            y = e.clientY;
-        }
-        offsetX = x - startX;
-        offsetY = y - startY;
-        imgZoom.style.transform = `translate(${offsetX}px, ${offsetY}px)`;
-        moved = true;
-    }
-    function endDrag() {
-        dragging = false;
-        overlay.style.cursor = 'grab';
-    }
+  }
+}, { passive: false });
 
-    imgZoom.addEventListener('mousedown', startDrag);
-    imgZoom.addEventListener('touchstart', startDrag);
-    window.addEventListener('mousemove', onDrag);
-    window.addEventListener('touchmove', onDrag, {passive:false});
-    window.addEventListener('mouseup', endDrag);
-    window.addEventListener('touchend', endDrag);
+zoomOverlay?.addEventListener('touchend', () => {
+  isDragging = false;
+}, { passive: true });
 
-    // Cerrar con click/tap si no se movió (en overlay o imagen)
-    let tapTimeout = null;
-    function cerrarSiNoMovio(e) {
-        // Evitar doble ejecución en móvil
-        if (tapTimeout) return;
-        tapTimeout = setTimeout(() => { tapTimeout = null; }, 300);
-        if (!moved) {
-            overlay.remove();
-            document.body.style.overflow = '';
-            imgZoom.style.transform = '';
-        }
-    }
-    overlay.addEventListener('click', cerrarSiNoMovio);
-    imgZoom.addEventListener('click', cerrarSiNoMovio);
-    overlay.addEventListener('touchend', cerrarSiNoMovio);
-    imgZoom.addEventListener('touchend', cerrarSiNoMovio);
-    // Prevenir scroll en overlay
-    overlay.addEventListener('wheel', e => e.preventDefault(), {passive:false});
+// Mouse events for zoom overlay
+zoomOverlay?.addEventListener('mousedown', (e) => {
+  if (e.button === 0) {
+    isDragging = true;
+    startX = e.clientX - currentX;
+    startY = e.clientY - currentY;
+  }
+});
+
+document.addEventListener('mousemove', (e) => {
+  if (isDragging && zoomOverlay?.classList.contains('active')) {
+    currentX = e.clientX - startX;
+    currentY = e.clientY - startY;
+    updateImageTransform();
+  }
+});
+
+document.addEventListener('mouseup', () => {
+  isDragging = false;
+});
+
+// Zoom with mouse wheel
+zoomOverlay?.addEventListener('wheel', (e) => {
+  e.preventDefault();
+  const zoomSpeed = 0.1;
+  const oldScale = scale;
+  scale += e.deltaY > 0 ? -zoomSpeed : zoomSpeed;
+  scale = Math.max(1, Math.min(scale, 3));
+  
+  if (scale !== oldScale) {
+    updateImageTransform();
+  }
+}, { passive: false });
+
+// Update image transform
+function updateImageTransform() {
+  zoomImage.style.transform = `translate(${currentX}px, ${currentY}px) scale(${scale})`;
 }
 
-document.querySelectorAll('.imagen-arte').forEach(img => {
-    // Solo abrir zoom con click (desktop)
-    img.addEventListener('click', function(e) {
-        crearZoomReal(img);
-    });
-    // Mejor experiencia móvil: solo abrir si el tap es real (no scroll)
-    let touchStartY = 0, touchStartX = 0, touchMoved = false;
-    img.addEventListener('touchstart', function(e) {
-        if (e.touches.length === 1) {
-            touchStartY = e.touches[0].clientY;
-            touchStartX = e.touches[0].clientX;
-            touchMoved = false;
-        }
-    });
-    img.addEventListener('touchmove', function(e) {
-        if (e.touches.length === 1) {
-            const dy = Math.abs(e.touches[0].clientY - touchStartY);
-            const dx = Math.abs(e.touches[0].clientX - touchStartX);
-            if (dy > 10 || dx > 10) touchMoved = true;
-        }
-    });
-    img.addEventListener('touchend', function(e) {
-        if (!touchMoved && e.changedTouches && e.changedTouches.length === 1 && !img.classList.contains('zoom-real-img')) {
-            crearZoomReal(img);
-        }
-    });
+// Smooth scroll behavior
+document.documentElement.style.scrollBehavior = 'smooth';
+
+// Add active state to nav links on scroll
+const sections = document.querySelectorAll('section[id]');
+const navLinks = document.querySelectorAll('nav a[href^="#"]');
+
+function updateActiveNavLink() {
+  let current = '';
+  sections.forEach(section => {
+    const sectionTop = section.offsetTop;
+    if (window.pageYOffset >= sectionTop - 60) {
+      current = section.getAttribute('id');
+    }
+  });
+
+  navLinks.forEach(link => {
+    link.classList.remove('active');
+    if (link.getAttribute('href').slice(1) === current) {
+      link.classList.add('active');
+    }
+  });
+}
+
+window.addEventListener('scroll', updateActiveNavLink);
+updateActiveNavLink();
+
+// Fade in elements on scroll
+const observerOptions = {
+  threshold: 0.1,
+  rootMargin: '0px 0px -100px 0px'
+};
+
+const observer = new IntersectionObserver((entries) => {
+  entries.forEach(entry => {
+    if (entry.isIntersecting) {
+      entry.target.classList.add('visible');
+      observer.unobserve(entry.target);
+    }
+  });
+}, observerOptions);
+
+document.querySelectorAll('.fade-in').forEach(el => {
+  observer.observe(el);
+});
+
+// Parallax effect
+window.addEventListener('scroll', () => {
+  document.querySelectorAll('[data-parallax]').forEach(element => {
+    const speed = element.dataset.parallax;
+    element.style.transform = `translateY(${window.scrollY * speed}px)`;
+  });
 });
