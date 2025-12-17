@@ -38,6 +38,7 @@ h1 {
     margin: 0 auto;
     position: relative;
     overflow: hidden;
+    touch-action: none;
 }
 
 
@@ -101,13 +102,17 @@ h1 {
 
 @media (max-width: 700px) {
     .img-3d {
-        width: 88vw;
-        max-width: 96vw;
-        height: 32vh;
+        width: 80vw;
+        max-width: 90vw;
+        height: 38vw;
+        left: 50%;
+        top: 50%;
+        transform: translate(-50%, -50%);
     }
     .galeria-3d {
-        min-height: 60vh;
+        min-height: 60vw;
         overflow: hidden;
-        touch-action: pan-y;
+        touch-action: none;
+        position: relative;
     }
 }
