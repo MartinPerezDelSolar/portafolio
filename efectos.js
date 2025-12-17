@@ -101,10 +101,15 @@ function crearZoomReal(img) {
     window.addEventListener('touchend', endDrag);
 
     // Cerrar con click/tap si no se movió (en overlay o imagen)
-    function cerrarSiNoMovio() {
+    let tapTimeout = null;
+    function cerrarSiNoMovio(e) {
+        // Evitar doble ejecución en móvil
+        if (tapTimeout) return;
+        tapTimeout = setTimeout(() => { tapTimeout = null; }, 300);
         if (!moved) {
             overlay.remove();
             document.body.style.overflow = '';
+            imgZoom.style.transform = '';
         }
     }
     overlay.addEventListener('click', cerrarSiNoMovio);
@@ -116,12 +121,28 @@ function crearZoomReal(img) {
 }
 
 document.querySelectorAll('.imagen-arte').forEach(img => {
+    // Solo abrir zoom con click (desktop)
     img.addEventListener('click', function(e) {
         crearZoomReal(img);
     });
+    // Mejor experiencia móvil: solo abrir si el tap es real (no scroll)
+    let touchStartY = 0, touchStartX = 0, touchMoved = false;
+    img.addEventListener('touchstart', function(e) {
+        if (e.touches.length === 1) {
+            touchStartY = e.touches[0].clientY;
+            touchStartX = e.touches[0].clientX;
+            touchMoved = false;
+        }
+    });
+    img.addEventListener('touchmove', function(e) {
+        if (e.touches.length === 1) {
+            const dy = Math.abs(e.touches[0].clientY - touchStartY);
+            const dx = Math.abs(e.touches[0].clientX - touchStartX);
+            if (dy > 10 || dx > 10) touchMoved = true;
+        }
+    });
     img.addEventListener('touchend', function(e) {
-        // Solo abrir si no hubo scroll
-        if (e.changedTouches && e.changedTouches.length === 1 && !img.classList.contains('zoom-real-img')) {
+        if (!touchMoved && e.changedTouches && e.changedTouches.length === 1 && !img.classList.contains('zoom-real-img')) {
             crearZoomReal(img);
         }
     });
