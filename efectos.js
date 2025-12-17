@@ -100,13 +100,17 @@ function crearZoomReal(img) {
     window.addEventListener('mouseup', endDrag);
     window.addEventListener('touchend', endDrag);
 
-    // Cerrar con click/tap si no se movió
-    overlay.addEventListener('click', function(e) {
+    // Cerrar con click/tap si no se movió (en overlay o imagen)
+    function cerrarSiNoMovio() {
         if (!moved) {
             overlay.remove();
             document.body.style.overflow = '';
         }
-    });
+    }
+    overlay.addEventListener('click', cerrarSiNoMovio);
+    imgZoom.addEventListener('click', cerrarSiNoMovio);
+    overlay.addEventListener('touchend', cerrarSiNoMovio);
+    imgZoom.addEventListener('touchend', cerrarSiNoMovio);
     // Prevenir scroll en overlay
     overlay.addEventListener('wheel', e => e.preventDefault(), {passive:false});
 }
